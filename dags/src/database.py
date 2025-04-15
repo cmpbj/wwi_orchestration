@@ -1,7 +1,11 @@
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy import create_engine
+from airflow.hooks.base import BaseHook
 
-POSTGRES_DATABASE_URL = "postgresql://user:K7414MaAeOWhq8YQP8TYpk3mxpOej19f@dpg-cvijik1r0fns738g95k0-a.oregon-postgres.render.com:5432/sales_db_rxft"
+conn = BaseHook.get_connection("wwi_postgres_connection")
+raw_uri = conn.get_uri()
+# Replace 'postgres://' with 'postgresql://' manually
+POSTGRES_DATABASE_URL = raw_uri.replace("postgres://", "postgresql://")
 
 engine = create_engine(POSTGRES_DATABASE_URL)
 

@@ -2,8 +2,23 @@ import requests
 import json
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from dags.src.models import HolidaysData, CitiesData, CustomersData
 from dags.src.database import engine, Base, get_db
+from dags.src.models import (
+    HolidaysData,
+    CitiesData,
+    CustomersData,
+    EmployeesData,
+    PaymentMethodData,
+    StockItemData,
+    TransactionTypeData,
+    MovementData,
+    OrdersData,
+    PurchaseData,
+    SalesData,
+    StockHoldingData,
+    TransactionsData,
+)
+
 
 HOLIDAY_URL_BASE = "https://brasilapi.com.br/api/feriados/v1/"
 WORLD_IMPORTERS_URL = "https://demodata.grapecity.com/wwi/api/v1/"
@@ -24,7 +39,7 @@ def holiday_func(date, db=DB):
     db.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
     db.commit()
 
-    Base.metadata.create_all(bind=engine)
+    HolidaysData.__table__.create(bind=engine, checkfirst=True)
     data = extract_holiday(date)
     try:
         for record in data:
@@ -39,66 +54,64 @@ def holiday_func(date, db=DB):
         db.rollback()
         print(f"Error loading data: {e}")
 
-def cities_func(endpoint, db=DB):
+def load_data(model_class=None, endpoint=None, db=DB):
+    if model_class is None:
+        raise ValueError("Model class must be provided")
+
     schema_name = "raw"
     db.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
     db.commit()
 
-    CitiesData.__table__.drop(bind=engine, checkfirst=True)
-    CitiesData.__table__.create(bind=engine)
-
-    # Extract data from the source
-    data = extract_world_importers(endpoint)
-
-    # Insert new data
-    try:
-        for record in data:
-            city = CitiesData(
-                cityKey=record.get("cityKey"),
-                city=record.get("city"),
-                stateProvince=record.get("stateProvince"),
-                country=record.get("country"),
-                continent=record.get("continent"),
-                salesTerritory=record.get("salesTerritory"),
-                region=record.get("region"),
-                subregion=record.get("subregion"),
-                latestRecordedPopulation=record.get("latestRecordedPopulation"),
-                validFrom=record.get("validFrom"),
-                validTo=record.get("validTo"),
-            )
-            db.add(city)
-        db.commit()
-    except SQLAlchemyError as e:
-        db.rollback()
-        print(f"Error loading data: {e}")
-
-def customers_func(endpoint, db=DB):
+    table_name = model_class.__tablename__
     schema_name = "raw"
-    db.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+    db.execute(text(f'DROP TABLE IF EXISTS {schema_name}.{table_name} CASCADE'))
     db.commit()
+    model_class.__table__.create(bind=db.get_bind())
 
-    CustomersData.__table__.drop(bind=engine, checkfirst=True)
-    CustomersData.__table__.create(bind=engine)
-
-    # Extract data from the source
     data = extract_world_importers(endpoint)
 
-    # Insert new data
     try:
         for record in data:
-            customer = CustomersData(
-                customerKey=record.get("customerKey"),
-                customer=record.get("customer"),
-                billToCustomer=record.get("billToCustomer"),
-                category=record.get("category"),
-                buyingGroup=record.get("buyingGroup"),
-                primaryContact=record.get("primaryContact"),
-                postalCode=record.get("postalCode"),
-                validFrom=record.get("validFrom"),
-                validTo=record.get("validTo"),
-            )
-            db.add(customer)
+            entry = model_class(**record)
+            db.add(entry)
         db.commit()
     except SQLAlchemyError as e:
         db.rollback()
-        print(f"Error loading data: {e}")
+        print(f"Error loading data into {model_class.__tablename__}: {e}")
+
+
+def employees_func(endpoint):
+    load_data(model_class=EmployeesData, endpoint=endpoint)
+
+def payment_method_func(endpoint):
+    load_data(model_class=PaymentMethodData, endpoint=endpoint)
+
+def stock_item_func(endpoint):
+    load_data(model_class=StockItemData, endpoint=endpoint)
+
+def transaction_type_func(endpoint):
+    load_data(model_class=TransactionTypeData, endpoint=endpoint)
+
+def movement_func(endpoint):
+    load_data(model_class=MovementData, endpoint=endpoint)
+
+def orders_func(endpoint):
+    load_data(model_class=OrdersData, endpoint=endpoint)
+
+def purchase_func(endpoint):
+    load_data(model_class=PurchaseData, endpoint=endpoint)
+
+def sales_func(endpoint):
+    load_data(model_class=SalesData, endpoint=endpoint)
+
+def stock_holding_func(endpoint):
+    load_data(model_class=StockHoldingData, endpoint=endpoint)
+
+def transactions_func(endpoint):
+    load_data(model_class=TransactionsData, endpoint=endpoint)
+
+def cities_func(endpoint):
+    load_data(model_class=CitiesData, endpoint=endpoint)
+
+def customers_func(endpoint):
+    load_data(model_class=CustomersData, endpoint=endpoint)
