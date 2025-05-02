@@ -63,10 +63,15 @@ def load_data(model_class=None, endpoint=None, db=DB):
     db.commit()
 
     table_name = model_class.__tablename__
-    schema_name = "raw"
-    db.execute(text(f'DROP TABLE IF EXISTS {schema_name}.{table_name} CASCADE'))
-    db.commit()
-    model_class.__table__.create(bind=db.get_bind())
+
+    try:
+        db.execute(text(f'TRUNCATE TABLE {schema_name}.{table_name} RESTART IDENTITY CASCADE'))
+        db.commit()
+    except SQLAlchemyError as e:
+        print(f"Error truncating table {schema_name}.{table_name}: {e}")
+        db.rollback()
+
+    model_class.__table__.create(bind=db.get_bind(), checkfirst=True)
 
     data = extract_world_importers(endpoint)
 
